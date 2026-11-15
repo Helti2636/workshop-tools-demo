@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ITEMS, CUSTOM_PREFIX, CUSTOM_MAX_LEN, itemName } from "../content";
 import { ItemIcon } from "./ItemIcon";
 
@@ -116,10 +117,13 @@ export function BackpackScene({
         </div>
       )}
 
-      {drag && (
+      {/* Rendered straight into <body> so it always sits under the pointer,
+          whatever transforms or animations the surrounding layout has. */}
+      {drag && createPortal(
         <div className="bp-ghost" style={{ left: drag.x, top: drag.y }}>
           <ItemCard id={drag.id} />
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { GROUPS, GROUP_LABEL, GROUP_DESC, PRIORITY_CARDS, type Group, type PriorityCard } from "../content";
 
 export function CardTile({ card, dragging, small, onPointerDown }: {
@@ -67,8 +68,10 @@ export function SortStage({ placed, onAssign }: {
           );
         })}
       </div>
-      {drag && card && (
-        <div className="pr-ghost" style={{ left: drag.x, top: drag.y }}><CardTile card={card} /></div>
+      {/* Rendered straight into <body> so it always sits under the pointer. */}
+      {drag && card && createPortal(
+        <div className="pr-ghost" style={{ left: drag.x, top: drag.y }}><CardTile card={card} /></div>,
+        document.body,
       )}
     </div>
   );
