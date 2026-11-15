@@ -516,7 +516,7 @@ export default function App() {
         </div>
         <main key={step} className="demo-step">{screen}</main>
       </div>
-      {AUTOPLAY && <div className="demo-caption" key={`c-${step}`}>{CAPTIONS[step]}</div>}
+      {AUTOPLAY && <div className={`demo-caption ${step === "end" ? "fade-out" : ""}`} key={`c-${step}`}>{CAPTIONS[step]}</div>}
       {/* people list kept for screen readers announcing the simulated group */}
       <span className="sr-only">Playing with {people.length - 1} simulated colleagues.</span>
     </div>

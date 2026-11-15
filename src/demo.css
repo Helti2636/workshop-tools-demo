@@ -500,3 +500,6 @@
   .tg-bar .tg-pips{gap:3px;}
   .tg-bar .tg-pip{width:12px;}
 }
+/* On the closing screen the caption steps aside so the last frame shows everything. */
+.demo-caption.fade-out{animation:demo-cap .45s ease both, demo-cap-out .6s ease 2.8s forwards;}
+@keyframes demo-cap-out{to{opacity:0; transform:translate(-50%,8px);}}
