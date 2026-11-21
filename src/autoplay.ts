@@ -1,15 +1,54 @@
 // Helpers for the self-playing video mode (?autoplay=1): a visible cursor that
 // glides to its target and "clicks", and cards that fly from A to B.
 
-export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+// ---- Pause / resume ----
+// When the tour is embedded (e.g. in a portfolio page), the host can pause it
+// like a video by posting {tour: "pause"} or {tour: "play"} to this window.
+let paused = false;
+let held: Animation[] = [];
+
+export function setPaused(p: boolean): void {
+  if (p === paused) return;
+  paused = p;
+  if (p) {
+    held = document.getAnimations().filter((a) => a.playState === "running");
+    held.forEach((a) => a.pause());
+  } else {
+    held.forEach((a) => { if (a.playState === "paused") a.play(); });
+    held = [];
+  }
+}
+
+window.addEventListener("message", (e) => {
+  if (e.source !== window.parent || !e.data || typeof e.data !== "object") return;
+  if (e.data.tour === "pause") setPaused(true);
+  if (e.data.tour === "play") setPaused(false);
+});
+
+/** Waits `ms` of playing time; the clock stops while the tour is paused. */
+export function sleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let left = ms;
+    let last = performance.now();
+    const tick = () => {
+      const now = performance.now();
+      if (!paused) left -= now - last;
+      last = now;
+      if (left <= 0) resolve();
+      else setTimeout(tick, Math.min(50, Math.max(4, left)));
+    };
+    setTimeout(tick, Math.min(50, Math.max(0, ms)));
+  });
+}
 
 /** Wait until an element matching the selector exists (the next step has rendered). */
 export async function waitFor(selector: string, timeout = 4000): Promise<HTMLElement> {
-  const t0 = performance.now();
-  while (performance.now() - t0 < timeout) {
+  let waited = 0;
+  while (waited < timeout) {
     const el = document.querySelector<HTMLElement>(selector);
     if (el) return el;
     await sleep(60);
+    waited += 60;
   }
   throw new Error("autoplay: element not found: " + selector);
 }
