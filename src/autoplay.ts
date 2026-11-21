@@ -73,7 +73,7 @@ export async function click(target: Element): Promise<void> {
  * Drag animation: a copy of `from` travels to `to` with the cursor holding it.
  * The caller applies the real state change afterwards.
  */
-export async function fly(from: HTMLElement, to: Element, ms = 750): Promise<void> {
+export async function fly(from: HTMLElement, to: Element, ms = 950): Promise<void> {
   await moveTo(from, 520);
   await tap();
   const a = from.getBoundingClientRect();
@@ -88,13 +88,39 @@ export async function fly(from: HTMLElement, to: Element, ms = 750): Promise<voi
   const dx = b.x - (a.left + a.width / 2);
   const dy = b.y - (a.top + a.height / 2);
   const c = cursor();
-  c.style.transition = `left ${ms}ms cubic-bezier(.45,.05,.25,1), top ${ms}ms cubic-bezier(.45,.05,.25,1)`;
-  requestAnimationFrame(() => {
-    ghost.style.transform = `translate(${dx}px, ${dy}px) scale(.82)`;
-    c.style.left = `${b.x}px`;
-    c.style.top = `${b.y}px`;
-  });
-  await sleep(ms + 40);
+  // Brief "pick up" lift, then card and cursor travel together. Both run as
+  // Web Animations with the same timing, so the card never jumps ahead of the
+  // cursor (a CSS transition on a freshly inserted element can skip straight
+  // to its end state, e.g. inside an iframe).
+  const ease = "cubic-bezier(.45,.05,.25,1)";
+  ghost.style.transition = "none";
+  await ghost.animate(
+    [{ transform: "none" }, { transform: "translateY(-6px) scale(1.06)" }],
+    { duration: 180, easing: "ease-out", fill: "forwards" },
+  ).finished;
+  const start = { x: a.left + a.width / 2, y: a.top + a.height / 2 };
+  c.style.transition = "none";
+  c.style.left = `${start.x}px`;
+  c.style.top = `${start.y}px`;
+  const move = ghost.animate(
+    [
+      { transform: "translateY(-6px) scale(1.06)" },
+      { transform: `translate(${dx}px, ${dy}px) scale(.82)` },
+    ],
+    { duration: ms, easing: ease, fill: "forwards" },
+  );
+  c.animate(
+    [
+      { left: `${start.x}px`, top: `${start.y}px` },
+      { left: `${b.x}px`, top: `${b.y}px` },
+    ],
+    { duration: ms, easing: ease, fill: "forwards" },
+  );
+  await move.finished;
+  c.getAnimations().forEach((an) => an.cancel());
+  c.style.left = `${b.x}px`;
+  c.style.top = `${b.y}px`;
+  await sleep(60);
   ghost.remove();
 }
 
