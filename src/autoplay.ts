@@ -38,7 +38,10 @@ function cursor(): HTMLDivElement {
 export async function moveTo(target: Element, ms = 650): Promise<void> {
   const r = target.getBoundingClientRect();
   if (r.top < 70 || r.bottom > window.innerHeight - 90) {
-    target.scrollIntoView({ block: "center", behavior: "smooth" });
+    // Scroll only this document. scrollIntoView would also scroll a page that
+    // embeds the demo in an iframe, making the whole host page jump.
+    const top = window.scrollY + r.top - (window.innerHeight - r.height) / 2;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
     await sleep(450);
   }
   const c = cursor();

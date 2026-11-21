@@ -40,6 +40,7 @@ const CAPTIONS: Record<Step, string> = {
 
 const params = new URLSearchParams(window.location.search);
 const AUTOPLAY = params.get("autoplay") === "1";
+const EMBEDDED = (() => { try { return window.self !== window.top; } catch { return true; } })();
 
 // ?jump=<step> opens a single screen with sample answers (for screenshots).
 const JUMP = (STEPS as readonly string[]).includes(params.get("jump") ?? "") ? (params.get("jump") as Step) : null;
@@ -495,7 +496,7 @@ export default function App() {
   }
 
   return (
-    <div className={`tg-app ${AUTOPLAY ? "demo-autoplay" : ""}`}>
+    <div className={`tg-app ${AUTOPLAY ? "demo-autoplay" : ""} ${EMBEDDED ? "demo-embedded" : ""}`}>
       <div className="tg-wrap">
         <div className="tg-bar">
           <div>

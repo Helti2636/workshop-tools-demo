@@ -488,7 +488,8 @@
   font-size:clamp(1rem,2.2vw,1.3rem); text-align:center; box-shadow:0 10px 30px -10px rgba(0,0,0,.5); animation:demo-cap .45s ease both;}
 @keyframes demo-cap{from{opacity:0; transform:translate(-50%,8px);} to{opacity:1; transform:translate(-50%,0);}}
 .demo-autoplay .tg-wrap{padding-bottom:7rem;}
-.demo-autoplay, .demo-autoplay *{cursor:none !important;}
+/* Hide the real mouse only for full-screen recordings; when embedded, the visitor keeps their cursor. */
+.demo-autoplay:not(.demo-embedded), .demo-autoplay:not(.demo-embedded) *{cursor:none !important;}
 .demo-3col{grid-template-columns:repeat(3,minmax(0,1fr));}
 .demo-3col .tg-opt-card{min-height:132px;}
 @media (max-width:640px){ .demo-3col{grid-template-columns:repeat(2,minmax(0,1fr));} }
