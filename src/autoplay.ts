@@ -1,23 +1,52 @@
 // Helpers for the self-playing video mode (?autoplay=1): a visible cursor that
 // glides to its target and "clicks", and cards that fly from A to B.
 
-// ---- Pause / resume ----
-// When the tour is embedded (e.g. in a portfolio page), the host can pause it
-// like a video by posting {tour: "pause"} or {tour: "play"} to this window.
+// ---- Tour clock: pause, resume and seek ----
+// When the tour is embedded (e.g. in a portfolio page) the host can control it
+// like a video: post {tour: "pause"} / {tour: "play"}, or load the page with
+// ?seek=<ms> to fast-forward to that point. The tour reports its position back
+// to the host with {tourClock, tourStep, seeking, done}.
+const SEEK = Math.max(0, Number(new URLSearchParams(location.search).get("seek")) || 0);
+const t0 = performance.now();
 let paused = false;
+let pauseStart = 0;
+let pausedTotal = 0;
+let skipped = 0;
 let held: Animation[] = [];
+let currentStep = "";
+let done = false;
+
+/** Playing time of the tour in ms (stops while paused, jumps while seeking). */
+export function clock(): number {
+  const now = performance.now();
+  return skipped + (now - t0) - pausedTotal - (paused ? now - pauseStart : 0);
+}
+/** True while the tour fast-forwards to the requested ?seek position. */
+export const seeking = () => clock() < SEEK;
 
 export function setPaused(p: boolean): void {
   if (p === paused) return;
   paused = p;
   if (p) {
+    pauseStart = performance.now();
     held = document.getAnimations().filter((a) => a.playState === "running");
     held.forEach((a) => a.pause());
   } else {
+    pausedTotal += performance.now() - pauseStart;
     held.forEach((a) => { if (a.playState === "paused") a.play(); });
     held = [];
   }
 }
+
+export function reportStep(step: string): void { currentStep = step; post(); }
+export function reportDone(): void { done = true; post(); }
+
+const embedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
+function post(): void {
+  if (!embedded) return;
+  window.parent.postMessage({ tourClock: Math.round(clock()), tourStep: currentStep, seeking: seeking(), done }, "*");
+}
+if (embedded) setInterval(post, 200);
 
 window.addEventListener("message", (e) => {
   if (e.source !== window.parent || !e.data || typeof e.data !== "object") return;
@@ -25,19 +54,22 @@ window.addEventListener("message", (e) => {
   if (e.data.tour === "play") setPaused(false);
 });
 
-/** Waits `ms` of playing time; the clock stops while the tour is paused. */
+/** Waits `ms` of tour time. Instant while seeking; the clock stops while paused. */
 export function sleep(ms: number): Promise<void> {
+  const target = clock() + ms;
   return new Promise<void>((resolve) => {
-    let left = ms;
-    let last = performance.now();
     const tick = () => {
-      const now = performance.now();
-      if (!paused) left -= now - last;
-      last = now;
+      const now = clock();
+      if (now < SEEK) {
+        // Fast-forward: jump the clock, but yield so React can render in between.
+        skipped += Math.min(target, SEEK) - now;
+        if (target <= SEEK) { setTimeout(resolve, 0); return; }
+      }
+      const left = target - clock();
       if (left <= 0) resolve();
-      else setTimeout(tick, Math.min(50, Math.max(4, left)));
+      else setTimeout(tick, seeking() ? 0 : Math.min(50, Math.max(4, left)));
     };
-    setTimeout(tick, Math.min(50, Math.max(0, ms)));
+    setTimeout(tick, 0);
   });
 }
 
@@ -80,12 +112,12 @@ export async function moveTo(target: Element, ms = 650): Promise<void> {
     // Scroll only this document. scrollIntoView would also scroll a page that
     // embeds the demo in an iframe, making the whole host page jump.
     const top = window.scrollY + r.top - (window.innerHeight - r.height) / 2;
-    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    window.scrollTo({ top: Math.max(0, top), behavior: seeking() ? "auto" : "smooth" });
     await sleep(450);
   }
   const c = cursor();
   const p = center(target);
-  c.style.transition = `left ${ms}ms cubic-bezier(.45,.05,.25,1), top ${ms}ms cubic-bezier(.45,.05,.25,1)`;
+  c.style.transition = seeking() ? "none" : `left ${ms}ms cubic-bezier(.45,.05,.25,1), top ${ms}ms cubic-bezier(.45,.05,.25,1)`;
   c.style.left = `${p.x}px`;
   c.style.top = `${p.y}px`;
   await sleep(ms + 60);
@@ -94,6 +126,7 @@ export async function moveTo(target: Element, ms = 650): Promise<void> {
 /** A small ripple where the cursor is, to read as a click in the recording. */
 export async function tap(): Promise<void> {
   const c = cursor();
+  if (seeking()) { await sleep(140); return; }
   const ripple = document.createElement("span");
   ripple.className = "demo-tap";
   ripple.style.left = c.style.left;
@@ -120,6 +153,14 @@ export async function fly(from: HTMLElement, to: Element, ms = 950): Promise<voi
   await tap();
   const a = from.getBoundingClientRect();
   const b = center(to);
+  if (seeking()) {
+    const c0 = cursor();
+    c0.style.transition = "none";
+    c0.style.left = `${b.x}px`;
+    c0.style.top = `${b.y}px`;
+    await sleep(180 + ms + 60);
+    return;
+  }
   const ghost = from.cloneNode(true) as HTMLElement;
   ghost.classList.add("demo-fly");
   ghost.style.left = `${a.left}px`;

@@ -9,7 +9,7 @@ import { Head, Note, Roster, Reveal, PersonaCard, CompareBoard, DiscussCard, Pip
 import { BackpackScene, BackpackView } from "./components/Backpack";
 import { SortStage, PriorityOverview } from "./components/Sort";
 import { printHtml, esc } from "./print";
-import { sleep, waitFor, click, fly, moveTo, hideCursor } from "./autoplay";
+import { sleep, waitFor, click, fly, moveTo, hideCursor, reportStep, reportDone } from "./autoplay";
 
 // ---------------------------------------------------------------------------
 // The tour, in order. Each step is one screen.
@@ -73,6 +73,7 @@ export default function App() {
 
   const idx = STEPS.indexOf(step);
   const go = useCallback((s: Step) => { setStep(s); window.scrollTo({ top: 0 }); }, []);
+  useEffect(() => { reportStep(step); }, [step]);
   const next = useCallback(() => go(STEPS[Math.min(STEPS.indexOf(step) + 1, STEPS.length - 1)]), [go, step]);
   const back = useCallback(() => go(STEPS[Math.max(STEPS.indexOf(step) - 1, 0)]), [go, step]);
 
@@ -85,9 +86,11 @@ export default function App() {
   // Colleagues "think" and lock in while the visitor is on the answer screen.
   useEffect(() => {
     if (step !== "answer") return;
-    const timers = PEER_DELAYS.map((ms, i) =>
-      setTimeout(() => setPeersDone((d) => d.map((v, k) => (k === i ? true : v))), ms));
-    return () => timers.forEach(clearTimeout);
+    // Runs on the tour clock, so colleagues also "think" faster while the tour is fast-forwarded.
+    let alive = true;
+    PEER_DELAYS.forEach((ms, i) =>
+      sleep(ms).then(() => { if (alive) setPeersDone((d) => d.map((v, k) => (k === i ? true : v))); }));
+    return () => { alive = false; };
   }, [step]);
 
   // Theme override for recordings: ?theme=dark / ?theme=light
@@ -211,7 +214,7 @@ export default function App() {
         }
         await hold(2200); await advance();
         await moveTo(await $("[data-pdf]")); await hold(4000);                        // end
-        hideCursor();
+        hideCursor(); reportDone();
       } catch (e) {
         console.warn(e);
       }
